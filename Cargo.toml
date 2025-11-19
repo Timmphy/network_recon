@@ -1,0 +1,10 @@
+[package]
+name = "network_recon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+surge-ping = "0.8"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+ipnet = "2.9"
