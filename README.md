@@ -1,14 +1,16 @@
-# 🚀 Network Reconnaissance Scanner (Net-Recon)
+# 📡 Network Reconnaissance Scanner (Net-Recon)
 
 A high-performance, asynchronous network scanner written in **Rust**. This tool allows for fast ICMP (Ping) scanning of entire CIDR subnets or checking the reachability of a single IP address using the `tokio` runtime.
 
 ## ✨ Features
 
-* **Multi-Mode Scanning:** Supports scanning of both **CIDR** network blocks (e.g., `192.168.1.0/24`) and **Single IP** addresses (e.g., `10.0.0.5`).
-* **Asynchronous Performance:** Utilizes the `tokio` runtime and `futures::join_all` to concurrently ping multiple hosts, significantly reducing scan time.
-* **Host Exclusion:** Automatically excludes the **Network ID** (first address) and **Broadcast Address** (last address) from CIDR scans using the `ipnet` crate.
-* **Clear Output:** Displays reachable hosts (`✅ Reachable`) along with their round-trip time (latency).
-
+* **Modular Architecture:** Clean separation of concerns across modules (main, scanner, dns) for maintainability and future expansion.
+* **Command Line Interface (CLI):** Utilizes the clap library for professional argument parsing, replacing interactive input.
+* **Reverse DNS Lookup:** Attempts to resolve the hostname of reachable devices using a user-specified DNS server (**--dns**).
+* **Asynchronous Performance:** Leverages the tokio runtime and futures::join_all to concurrently ping multiple hosts, significantly reducing scan time.
+* **Multi-Mode Scanning:** Supports scanning of both **CIDR** network blocks (e.g., `192.168.1.0/24`) and Single IP addresses.
+* **Host Exclusion:** Automatically excludes the **Network ID** and Broadcast Address from CIDR scans.
+* **Clear Output:** Displays reachable hosts (✅ Reachable) along with their hostname, IP, and round-trip time (latency).
 ---
 
 ## 🛠️ Prerequisites
@@ -40,7 +42,7 @@ On Linux, elevated privileges (sudo) are strictly required to send ICMP packets.
 cargo build --release
 
 # 2. Run the scanner with sudo
-sudo ./target/release/network_recon
+sudo ./target/release/network_recon -i 192.168.178.0/24
 ```
 #### Windows
 On Windows, the compiled executable (.exe) should be run with Administrator privileges.
@@ -50,5 +52,13 @@ cargo build --release
 
 # 2. Navigate to the release folder and execute:
 # Note: You MUST right-click the file and select "Run as administrator" or run from an Admin PowerShell/CMD.
-.\target\release\network_recon.exe
+.\target\release\network_recon.exe -i 192.168.178.0/24
 ```
+## ⚙️ Usage
+The scanner is controlled entirely via command-line flags. Use the --help flag for a quick reference.
+
+#### Arguments
+| Argument | Short | Description | Default |
+|:--------:|:--------:|:--------:|:--------:|
+|`--ip`|`-i`|Target IP or CIDR network block to scan. (Required)|None|
+|`--dns`|`-d`|Custom DNS server for reverse lookups.|192.168.178.1|
