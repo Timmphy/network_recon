@@ -1,64 +1,61 @@
-use std::io;
-use std::net::{IpAddr};
-use std::time::Duration;
-use futures::future::join_all;
-use ipnet::IpNet;
+use clap::Parser; // <-- Import für die CLI-Argumente
+use std::net::IpAddr; // For IpAddr Typ
+use futures::future::join_all; // For asynchrone Tasks
+use ipnet::IpNet; // For CIDR processing
 
-// ----------------------------------------------------------------------
-// FUNCTION TO HANDLE SINGLE IP PING (Extracted logic for reuse)
-// ----------------------------------------------------------------------
+// Import Modules
+mod dns;
+mod scanner;
+use scanner::ping_single_host;
 
-async fn ping_single_host(ip_addr: IpAddr) -> Option<(IpAddr, Duration)> { // Returns Option<(IP, Time)> or None (if unreachable). Forces caller to check for errors. Anti NULL protection via RUST.
-    // surge_ping::ping is used here
-    let result = surge_ping::ping(ip_addr, &[0; 8]).await;
-    
-    match result {
-        Ok((_, duration)) => Some((ip_addr, duration)),
-        Err(_) => None, 
-    }
+// --- 1. Definition ---
+#[derive(Parser, Debug)]
+#[command(author = "Tphy", version, about = "Fast network reconnaissance tool", long_about = None)]
+struct Args {
+    /// The target IP or Network CIDR (e.g., --ip 192.168.0.1 or 192.168.0.0/24)
+    #[arg(long = "ip", short = 'i')] 
+    target: String,
+
+    /// Custom DNS server for name resolution (optional)
+    #[arg(long, short, default_value = "192.168.178.1")]
+    dns: IpAddr,
 }
 
-// ----------------------------------------------------------------------
-// MAIN APPLICATION LOGIC
-// ----------------------------------------------------------------------
 #[tokio::main]
 async fn main() {
-    println!("--- Multi-Mode Network Scanner ---");
-    println!("Enter target(s): [CIDR e.g., 192.168.1.0/24] OR [Single IP e.g., 192.168.1.1]:");
+    // --- 2. Parse CLI arguments ---
+    let args = Args::parse(); // CLI argument parsing
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Error reading input");
-    let target = input.trim();
+    let target_input = args.target.as_str(); // The target IP or CIDR from the arguments
+    let dns_server = args.dns; // The DNS IP from the arguments (or the default)
+    println!("--- Network Scanner ---");
+    println!("Target: {}", target_input);
+    println!("DNS Server: {}", dns_server);
 
-    // 1. Determine if the target is a CIDR block or a single IP
-    
-    let is_cidr = target.contains('/');
-    let mut scan_ips: Vec<IpAddr> = Vec::new();
+    // --- 3. Process target (CIDR or Single IP) ---
+    let is_cidr = target_input.contains('/'); // Check if CIDR notation is used
+    let mut scan_ips: Vec<IpAddr> = Vec::new(); // Vector to hold IPs to scan
 
-    if is_cidr {
-        // --- CIDR LOGIC ---
-        let net: IpNet = match target.parse() {
-            Ok(n) => n,
-            Err(_) => {
-                eprintln!("Error: '{}' is not a valid CIDR address.", target);
+    if is_cidr { 
+        // CIDR Logik
+        let net: IpNet = match target_input.parse() { // Parse CIDR
+            Ok(n) => n, // If successful, use the network
+            Err(_) => { // If parsing fails, print error and exit
+                eprintln!("Error: '{}' is not a valid CIDR address.", target_input);
                 return;
             }
         };
         
-        // Exclude Network ID (first) and Broadcast Address (last)
-        for ip in net.hosts().collect::<Vec<_>>().into_iter().skip(1).rev().skip(1).rev() { // Skip first and last
-             scan_ips.push(ip);
+        // Collect all usable host IPs in the CIDR range, excluding network and broadcast addresses
+        for ip in net.hosts().collect::<Vec<_>>().into_iter().skip(1).rev().skip(1).rev() { // Skip network and broadcast
+             scan_ips.push(ip); // Add to vector
         }
-        
     } else {
-        // --- SINGLE IP LOGIC ---
-        // Try to parse the input as a single IP
-        match target.parse::<IpAddr>() { // Try to parse as single IP
-            Ok(ip) => {
-                scan_ips.push(ip);
-            },
-            Err(_) => {
-                eprintln!("Error: '{}' is neither a valid CIDR address nor a single IP address.", target); 
+        // Single IP Logic
+        match target_input.parse::<IpAddr>() { 
+            Ok(ip) => scan_ips.push(ip), // If successful, add to vector
+            Err(_) => { // If parsing fails, print error and exit
+                eprintln!("Error: '{}' is neither a valid CIDR nor IP.", target_input); 
                 return;
             }
         }
@@ -70,29 +67,27 @@ async fn main() {
         return;
     }
 
-    println!("Scanning {} target(s) in {} mode. Please wait...", total_hosts, 
-             if is_cidr { "CIDR" } else { "Single Host" });
+    println!("Scanning {} target(s)... Please wait.", total_hosts);
 
-    // 2. Create asynchronous tasks
+    // --- 4. start scan ---
     let mut scan_tasks = vec![];
     
     for ip_addr in scan_ips {
-        // We now call the dedicated async function for the ping task
-        let task = tokio::spawn(ping_single_host(ip_addr));
+        // Spawn Tasks for each IP
+        let task = tokio::spawn(ping_single_host(ip_addr, dns_server)); // DNS server passed to ping function
         scan_tasks.push(task);
     } 
 
-    // 3. Wait for all tasks in parallel
-    let results = join_all(scan_tasks).await;
+    // Wait for all tasks to complete
+    let results = join_all(scan_tasks).await; // Wait for all tasks to complete
 
-    // 4. Output results
-    println!("\n--- Scan Results for {} ---", target);
+    // --- 5. Output ---
+    println!("\n--- Scan Results ---");
     let mut devices_found = 0;
 
     for result in results {
-        // The result here is Option<T> because the task handles the error internally
-        if let Ok(Some((ip, duration))) = result {
-            println!("✅ Reachable: {} (Time: {:.2?})", ip, duration);
+        if let Ok(Some((ip, duration, hostname))) = result { // Check if ping was successful
+            println!("✅ Reachable: {:<15} ({}) \tTime: {:.2?}", ip, hostname, duration); // Print reachable IPs with hostname and time
             devices_found += 1;
         }
     }

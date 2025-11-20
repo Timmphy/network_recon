@@ -1,6 +1,6 @@
 [package]
 name = "network_recon"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
@@ -8,3 +8,5 @@ surge-ping = "0.8"
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 ipnet = "2.9"
+trust-dns-resolver = "0.23.2" 
+clap = { version = "4.4", features = ["derive"] } # for arguments

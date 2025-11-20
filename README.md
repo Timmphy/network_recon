@@ -33,7 +33,7 @@ git clone https://github.com/Timmphy/network_recon.git
 cd network_recon
 ```
 ### 2. Compile and Run (Platform-Specific)
-## Linux / WSL (Recommended for Development)
+#### Linux / WSL (Recommended for Development)
 On Linux, elevated privileges (sudo) are strictly required to send ICMP packets.
 ```bash
 # 1. Compile the optimized release binary
@@ -42,7 +42,7 @@ cargo build --release
 # 2. Run the scanner with sudo
 sudo ./target/release/network_recon
 ```
-## Windows
+#### Windows
 On Windows, the compiled executable (.exe) should be run with Administrator privileges.
 ```bash
 # 1. Compile the optimized release executable
